@@ -1,8 +1,6 @@
-# PyTorch: install the build for your platform first if pip does not pick a GPU wheel:
-# https://pytorch.org/get-started/locally/
-torch
-coqui-tts
-# transformers 5.2+ removed isin_mps_friendly, which coqui-tts imports - pin below 5.
-transformers>=4.57,<5
-gTTS
+coqui-tts==0.27.5
+torch==2.8.0
+torchaudio==2.8.0
+transformers==4.57.6
 gradio
+static-ffmpeg==3.0
