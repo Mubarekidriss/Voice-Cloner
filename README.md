@@ -18,7 +18,7 @@ The first run downloads about 2 GB of model weights (3-5 minutes). Open the
 
 ```
 pip install -r requirements.txt
-python app.py
+python modules\app.py
 ```
 
 A GPU is strongly recommended; XTTS on CPU is very slow. See DEMO.md for a full walkthrough.

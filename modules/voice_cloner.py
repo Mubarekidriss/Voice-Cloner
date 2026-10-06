@@ -23,9 +23,6 @@ def clone_voices(tts, text, reference_audio, language):
 
     Only the speaker source differs.
     """
-    print("text:", repr(text))
-    print("reference_audio:", repr(reference_audio))
-    print("language:", repr(language))
 
     if not text or not text.strip():
         raise gr.Error("Type some text first.")

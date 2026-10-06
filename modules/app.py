@@ -72,9 +72,6 @@ def main():
     demo = create_interface(tts)
     result = demo.launch()
 
-    input("Press Enter to exit...")
-
-
 # ---------------------------------------------------------------------------
 # Start application
 # ---------------------------------------------------------------------------

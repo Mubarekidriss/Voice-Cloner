@@ -20,7 +20,7 @@
 
 ```
 pip install -r requirements.txt
-python app.py
+python modules\app.py
 ```
 
 Open the printed local URL (default http://127.0.0.1:7860). Same three steps.
