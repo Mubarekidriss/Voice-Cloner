@@ -3,6 +3,7 @@ import gradio as gr
 from config import DEFAULT_SPEAKER, LANGUAGES
 from voice_cloner import generate_voices
 from audio_utils import normalize_audio
+from audio_validation import validate_audio, AudioValidationError
 
 
 def create_interface(tts):
@@ -10,6 +11,11 @@ def create_interface(tts):
     def convert_reference(reference_audio):
         if not reference_audio:
             raise gr.Error("Record or upload a voice sample first.")
+
+        try:
+            validate_audio(reference_audio)
+        except AudioValidationError as exc:
+            raise gr.Error(str(exc)) from exc
 
         try:
             wav_path = normalize_audio(reference_audio)
