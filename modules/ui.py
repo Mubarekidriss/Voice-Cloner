@@ -43,6 +43,11 @@ def create_interface(tts):
         if not reference:
             raise gr.Error("Please record or upload a voice sample.")
 
+        try:
+            validate_audio(original_audio)
+        except AudioValidationError as exc:
+            raise gr.Error(str(exc)) from exc
+
         return generate_voices(tts, text, reference, lang)
 
 
