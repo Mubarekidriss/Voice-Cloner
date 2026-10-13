@@ -1,5 +1,6 @@
 """Tests for modules/audio_validation.py. Run from the repo root: pytest"""
 
+import static_ffmpeg
 import math
 import os
 import shutil
@@ -157,8 +158,12 @@ def test_oversized_file(tmp_path, monkeypatch):
 # Other formats (decoded with ffmpeg; skipped when ffmpeg is not installed)
 # ---------------------------------------------------------------------------
 
+# Initialize the FFmpeg executable provided by static-ffmpeg.
+static_ffmpeg.add_paths()
+
 needs_ffmpeg = pytest.mark.skipif(
-    shutil.which("ffmpeg") is None, reason="ffmpeg not installed"
+    shutil.which("ffmpeg") is None,
+    reason="static-ffmpeg executable not available",
 )
 
 

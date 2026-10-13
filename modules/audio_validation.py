@@ -29,7 +29,7 @@ ffmpeg cannot decode a file, it is reported as unreadable.
 
 Limits are the constants below, so the team can change them in one place.
 """
-
+import static_ffmpeg
 import array
 import math
 import os
@@ -179,12 +179,23 @@ def _to_mono(raw, channels):
 
 
 def _ffmpeg_path():
-    found = shutil.which("ffmpeg")
-    if found:
-        return found
+    try:
+        # Ensure static_ffmpeg's bundled executable is available.
+        static_ffmpeg.add_paths()
+
+        found = shutil.which("ffmpeg")
+        if found:
+            return found
+
+    except Exception as exc:
+        raise AudioValidationError(
+            "FFmpeg could not be initialized to read this audio file. "
+            "Please try a WAV file or contact support."
+        ) from exc
+
     raise AudioValidationError(
-        "This audio format cannot be checked on this machine (ffmpeg is "
-        "not available). Please use a WAV file."
+        "FFmpeg is unavailable, so this audio format cannot be checked. "
+        "Please try a WAV file."
     )
 
 

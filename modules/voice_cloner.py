@@ -6,29 +6,19 @@ import gradio as gr
 from config import DEFAULT_SPEAKER, LANGUAGES
 
 
-# ---------------------------------------------------------------------------
-# Voice conversion
-# ---------------------------------------------------------------------------
-def clone_voices(tts, text, reference_audio, language):
+def generate_voices(tts, text, reference_audio, language):
     """
-    Generate two outputs using XTTS v2:
-
-        1. Baseline TTS using a predefined XTTS speaker
-        2. Voice-cloned speech using the user's reference recording
-
-    Both outputs use:
-        - the same text
-        - the same XTTS model
-        - the same selected language
-
-    Only the speaker source differs.
+    Generate baseline and cloned speech using the same text,
+    language, and XTTS model.
     """
 
     if not text or not text.strip():
         raise gr.Error("Type some text first.")
 
-    if reference_audio is None:
-        raise gr.Error("Record or upload a voice sample first.")
+    if not reference_audio or not os.path.isfile(reference_audio):
+        raise gr.Error(
+            "Convert or upload a reference audio file first."
+        )
 
     if language not in LANGUAGES:
         raise gr.Error("Please select a supported language.")
@@ -40,49 +30,44 @@ def clone_voices(tts, text, reference_audio, language):
     clone_path = None
 
     try:
-        # ---------------------------------------------------------------
-        # 1. Baseline TTS using a predefined XTTS speaker
-        # ---------------------------------------------------------------
-
         standard_path = _create_temp_path("_standard.wav")
+        clone_path = _create_temp_path("_cloned.wav")
 
+        # Baseline TTS: predefined speaker.
         tts.tts_to_file(
             text=text,
             speaker=DEFAULT_SPEAKER,
             language=language_code,
-            file_path=standard_path
+            file_path=standard_path,
         )
 
-        # ---------------------------------------------------------------
-        # 2. Voice cloning using the user's reference recording
-        # ---------------------------------------------------------------
-
-        clone_path = _create_temp_path("cloned.wav")
+        # Voice clone: normalized reference WAV.
         tts.tts_to_file(
             text=text,
             speaker_wav=reference_audio,
             language=language_code,
-            file_path=clone_path
+            file_path=clone_path,
         )
 
         return standard_path, clone_path
 
-    except Exception as e:
-        # Clean up files if conversion fails.
+    except Exception as exc:
         _cleanup(standard_path, clone_path)
-        raise gr.Error(f"Voice conversion failed: {e}")
+        raise gr.Error(f"Voice generation failed: {exc}") from exc
 
 
 def _create_temp_path(suffix):
-    file = tempfile.NamedTemporaryFile(
-                suffix=suffix,
-                delete=False
-            )
-    path = file.name
-    file.close()
-    return path
+    with tempfile.NamedTemporaryFile(
+        suffix=suffix,
+        delete=False,
+    ) as temp_file:
+        return temp_file.name
+
 
 def _cleanup(*paths):
     for path in paths:
         if path and os.path.exists(path):
-            os.remove(path)
+            try:
+                os.remove(path)
+            except OSError:
+                pass

@@ -41,15 +41,11 @@ import static_ffmpeg
 
 static_ffmpeg.add_paths()
 
-# ---------------------------------------------------------------------------
 # Remaining imports
-# ---------------------------------------------------------------------------
 
 import os
 
-# ---------------------------------------------------------------------------
 # Coqui configuration
-# ---------------------------------------------------------------------------
 
 # Running this app means YOU accept the Coqui Public Model License (CPML).
 # https://coqui.ai/cpml
@@ -61,25 +57,13 @@ from tts_engine import load_tts
 from ui import create_interface
 
 def main():
-# ---------------------------------------------------------------------------
 # Load XTTS
-# ---------------------------------------------------------------------------
     tts = load_tts()
-
-# ---------------------------------------------------------------------------
 # Gradio interface
-# ---------------------------------------------------------------------------
     demo = create_interface(tts)
-    result = demo.launch()
+    demo.launch()
 
-# ---------------------------------------------------------------------------
 # Start application
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # Local demo:
-    # http://127.0.0.1:7860
-    #
-    # Set share=True only if you intentionally want to expose the
-    # application through a temporary public Gradio link.
     main()

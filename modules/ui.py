@@ -1,81 +1,167 @@
 import gradio as gr
 
 from config import DEFAULT_SPEAKER, LANGUAGES
-from voice_cloner import clone_voices
+from voice_cloner import generate_voices
+from audio_utils import normalize_audio
 
 
 def create_interface(tts):
-    return gr.Interface(
-        fn=lambda text, reference_audio, language:
-            clone_voices(tts, text, reference_audio, language),
 
-        inputs=[
-            # ---------------------------------------------------------------
-            # Text
-            # ---------------------------------------------------------------
+    def convert_reference(reference_audio):
+        if not reference_audio:
+            raise gr.Error("Record or upload a voice sample first.")
 
-            gr.Textbox(
+        try:
+            wav_path = normalize_audio(reference_audio)
+            return wav_path, wav_path, wav_path
+        except Exception as exc:
+            raise gr.Error(f"Audio conversion failed: {exc}") from exc
+
+    def clear_all():
+        return (
+            "",      # Text input
+            None,    # Original audio
+            "English",  # Language reset
+            None,    # Normalized audio state
+            None,    # Normalized audio preview
+            None,    # WAV download
+            None,    # Baseline output
+            None,    # Cloned output
+        )
+    
+    # Prefer normalized audio when available.
+    # Otherwise, use the original recording.
+    def generate_from_input(text, original_audio, normalized_audio, lang):
+        reference = normalized_audio or original_audio
+
+        if not reference:
+            raise gr.Error("Please record or upload a voice sample.")
+
+        return generate_voices(tts, text, reference, lang)
+
+
+    with gr.Blocks(title="Voice Cloner") as demo:
+
+        gr.Markdown("# Voice Cloner")
+        gr.Markdown(
+            "Record or upload a voice sample, convert it to a "
+            "normalized WAV file, and compare baseline TTS with "
+            "a clone of the reference voice."
+        )
+
+        clear_button = gr.Button("Clear All", variant="secondary")
+
+        # Stores the converted WAV path between button clicks.
+        normalized_audio_state = gr.State(value=None)
+
+        with gr.Group():
+            gr.Markdown("## 1. Input")
+
+            text_input = gr.Textbox(
                 label="Text to speak",
                 placeholder="Type a sentence or two...",
-                lines=3
-            ),
+                lines=3,
+            )
 
-            # ---------------------------------------------------------------
-            # Voice sample
-            #
-            # This is the ORIGINAL recording/player.
-            # The user can listen to it before pressing Convert.
-            # Gradio normalizes the input to WAV for backend processing.
-            # ---------------------------------------------------------------
-
-            gr.Audio(
-                label="Voice sample to clone",
+            reference_audio = gr.Audio(
+                label="Original voice sample",
                 sources=["microphone", "upload"],
                 type="filepath",
-                format="wav"
-            ),
+                format="wav",
+            )
 
-            # ---------------------------------------------------------------
-            # Language
-            # ---------------------------------------------------------------
-
-            gr.Dropdown(
+            language = gr.Dropdown(
                 choices=list(LANGUAGES.keys()),
                 value="English",
-                label="Speech language"
-            ),
-        ],
+                label="Speech language",
+            )
 
-        outputs=[
-            # ---------------------------------------------------------------
-            # Baseline XTTS output
-            # ---------------------------------------------------------------
+            convert_button = gr.Button(
+                "Convert / Normalize to WAV",
+                variant="secondary",
+            )
 
-            gr.Audio(
-                label=f"Baseline TTS (XTTS - {DEFAULT_SPEAKER})"
-            ),
+        with gr.Group():
+            gr.Markdown("## 2. Converted reference audio")
 
-            # ---------------------------------------------------------------
-            # Cloned XTTS output
-            # ---------------------------------------------------------------
+            normalized_preview = gr.Audio(
+                label="Normalized WAV — preview",
+                type="filepath",
+            )
 
-            gr.Audio(
-                label="Voice Clone (XTTS v2)"
-            ),
-        ],
+            normalized_download = gr.File(
+                label="Download normalized WAV",
+            )
 
-        title="Voice Cloner",
+        convert_button.click(
+            fn=convert_reference,
+            inputs=[reference_audio],
+            outputs=[
+                normalized_audio_state,
+                normalized_preview,
+                normalized_download,
+            ],
+        )
 
-        description=(
-            "ICS 499 capstone - Group 12 (Mubarek Idris & Mikita Misiulia). "
-            "Record or upload a voice sample, listen to it before conversion, "
-            "select a language, and compare a predefined XTTS voice with "
-            "a clone of the reference voice."
-        ),
+        with gr.Group():
+            gr.Markdown("## 3. Generate and compare")
 
-        article=(
-            "**Responsible use:** only clone a voice with that person's permission. "
-            "Cloning someone without consent can be used for fraud or impersonation. "
-            "This demonstration runs locally on your own machine."
-        ),
-    )
+            generate_button = gr.Button(
+                "Generate Speech",
+                variant="primary",
+            )
+
+            baseline_output = gr.Audio(
+                label=f"Baseline TTS (XTTS - {DEFAULT_SPEAKER})",
+            )
+
+            cloned_output = gr.Audio(
+                label="Voice Clone (XTTS v2)",
+            )
+
+            generate_button.click(
+                fn=generate_from_input,
+                inputs=[
+                    text_input,
+                    reference_audio,
+                    normalized_audio_state,
+                    language,
+                ],
+                outputs=[
+                    baseline_output,
+                    cloned_output,
+                ],
+            )
+
+            clear_button.click(
+                fn=clear_all,
+                inputs=[],
+                outputs=[
+                    text_input,
+                    reference_audio,
+                    language,
+                    normalized_audio_state,
+                    normalized_preview,
+                    normalized_download,
+                    baseline_output,
+                    cloned_output,
+                ],
+            )
+
+            reference_audio.change(
+                fn=lambda: (None, None, None),
+                inputs=[],
+                outputs=[
+                    normalized_audio_state,
+                    normalized_preview,
+                    normalized_download,
+                ],
+            )
+
+        gr.Markdown(
+            "**Responsible use:** Only clone a voice with the "
+            "speaker's permission. This demonstration runs locally "
+            "on your machine."
+        )
+
+    return demo
