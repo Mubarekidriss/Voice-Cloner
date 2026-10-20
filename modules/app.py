@@ -61,7 +61,10 @@ def main():
     tts = load_tts()
 # Gradio interface
     demo = create_interface(tts)
-    demo.launch()
+    try:
+        demo.launch()
+    finally:
+        tts.close()
 
 # Start application
 

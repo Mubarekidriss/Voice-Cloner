@@ -5,3 +5,6 @@ transformers==4.57.6
 gradio
 static-ffmpeg==3.0
 pydub
+pypinyin
+cutlet
+unidic-lite
