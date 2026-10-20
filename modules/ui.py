@@ -77,27 +77,48 @@ def create_interface(tts_service: XTTSService):
             raise gr.Error(str(exc)) from exc
 
     with gr.Blocks(title="Voice Cloner") as demo:
-        gr.Markdown("# Voice Cloner")
-        gr.Markdown(
-            "Record or upload a voice sample, convert it to a normalized WAV "
-            "file, and compare baseline TTS with a clone of the reference voice."
-        )
-
         lang_total = len(LANGUAGES)
         lang_loaded = len(tts_service.available_languages)
-        gr.Markdown(
-            f"**Engine status:** XTTS v2 loaded on `{tts_service.device}` - "
-            f"{lang_loaded} of {lang_total} languages available."
+        verified = _load_verify_results()
+
+        gr.HTML(
+            f"""
+            <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+                        border-radius: 12px; padding: 20px 24px; color: white;
+                        margin-bottom: 8px;">
+              <div style="font-size: 26px; font-weight: 700;">Voice Cloner</div>
+              <div style="opacity: 0.9; margin-top: 4px;">
+                Record or upload a voice sample, convert it to a normalized WAV,
+                and compare baseline TTS with a clone of the reference voice.
+              </div>
+              <div style="margin-top: 12px; display: inline-block; background: rgba(255,255,255,0.18);
+                          border-radius: 999px; padding: 4px 14px; font-size: 14px;">
+                &#9881; XTTS v2 engine &middot; device: <b>{tts_service.device}</b>
+                &middot; {lang_loaded}/{lang_total} languages loaded
+              </div>
+            </div>
+            """
         )
 
-        verified = _load_verify_results()
-        with gr.Accordion(f"Language support ({lang_total} languages)", open=False):
-            lines = []
-            for lang_name, lang_code in LANGUAGES.items():
-                mark = "\u2705" if lang_code in tts_service.available_languages else "\u274c"
-                note = f" - {verified[lang_code]}" if lang_code in verified else ""
-                lines.append(f"- {mark} **{lang_name}** ({lang_code}){note}")
-            gr.Markdown("\n".join(lines))
+        chips = []
+        for lang_name, lang_code in LANGUAGES.items():
+            ok = lang_code in tts_service.available_languages
+            bg = "#16a34a" if ok else "#dc2626"
+            mark = "&#10003;" if ok else "&#10007;"
+            note = " &middot; smoke-tested" if lang_code in verified else ""
+            chips.append(
+                f'<span style="background:{bg}; color:white; border-radius:999px;'
+                f'padding:5px 12px; font-size:13px; white-space:nowrap;">'
+                f'{mark} {lang_name}{note}</span>'
+            )
+        gr.HTML(
+            '<div style="margin: 6px 0 14px 0;">'
+            '<div style="font-weight:600; margin-bottom:6px;">Language support '
+            f'({lang_total} languages)</div>'
+            '<div style="display:flex; flex-wrap:wrap; gap:6px;">'
+            + "".join(chips) +
+            "</div></div>"
+        )
 
         clear_button = gr.Button("Clear All", variant="secondary")
         normalized_audio_state = gr.State(value=None)
@@ -135,9 +156,10 @@ def create_interface(tts_service: XTTSService):
 
         with gr.Group():
             gr.Markdown("## 3. Generate and compare")
-            generate_button = gr.Button("Generate Speech", variant="primary")
-            baseline_output = gr.Audio(label=f"Baseline TTS (XTTS - {DEFAULT_SPEAKER})")
-            cloned_output = gr.Audio(label="Voice Clone (XTTS v2)")
+            generate_button = gr.Button("Generate Speech", variant="primary", size="lg")
+            with gr.Row():
+                baseline_output = gr.Audio(label=f"Baseline TTS (XTTS - {DEFAULT_SPEAKER})")
+                cloned_output = gr.Audio(label="Voice Clone (XTTS v2)")
 
             generate_button.click(
                 fn=generate_from_input,
