@@ -1,9 +1,32 @@
+import json
+from pathlib import Path
+
 import gradio as gr
 
 from config import DEFAULT_SPEAKER, LANGUAGES
 from audio_utils import normalize_audio
 from audio_validation import validate_audio, AudioValidationError
 from tts_engine import TTSEngineError, XTTSService
+
+
+def _load_verify_results() -> dict:
+    """Read smoke-test results written by verify_languages.py, when present.
+
+    Returns {language_code: note} for languages that passed. Missing or
+    malformed file means "no verification run recorded" - not an error.
+    """
+    path = Path(__file__).resolve().parent.parent / "verify_results.json"
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    results = data.get("results", data) if isinstance(data, dict) else {}
+    out = {}
+    for code, entry in results.items():
+        ok = entry.get("ok") if isinstance(entry, dict) else entry in (True, "ok")
+        if ok:
+            out[code] = "smoke-tested"
+    return out
 
 
 def create_interface(tts_service: XTTSService):
@@ -59,6 +82,22 @@ def create_interface(tts_service: XTTSService):
             "Record or upload a voice sample, convert it to a normalized WAV "
             "file, and compare baseline TTS with a clone of the reference voice."
         )
+
+        lang_total = len(LANGUAGES)
+        lang_loaded = len(tts_service.available_languages)
+        gr.Markdown(
+            f"**Engine status:** XTTS v2 loaded on `{tts_service.device}` - "
+            f"{lang_loaded} of {lang_total} languages available."
+        )
+
+        verified = _load_verify_results()
+        with gr.Accordion(f"Language support ({lang_total} languages)", open=False):
+            lines = []
+            for lang_name, lang_code in LANGUAGES.items():
+                mark = "\u2705" if lang_code in tts_service.available_languages else "\u274c"
+                note = f" - {verified[lang_code]}" if lang_code in verified else ""
+                lines.append(f"- {mark} **{lang_name}** ({lang_code}){note}")
+            gr.Markdown("\n".join(lines))
 
         clear_button = gr.Button("Clear All", variant="secondary")
         normalized_audio_state = gr.State(value=None)
