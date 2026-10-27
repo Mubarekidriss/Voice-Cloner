@@ -57,6 +57,7 @@ def create_interface(tts_service: XTTSService):
             None,     # WAV download
             None,     # Baseline output
             None,     # Cloned output
+            gr.DownloadButton(value=None, interactive=False),  # Clone download
         )
 
     def generate_from_input(text, original_audio, normalized_audio, language):
@@ -75,6 +76,16 @@ def create_interface(tts_service: XTTSService):
             return tts_service.generate_voices(text, reference, language)
         except TTSEngineError as exc:
             raise gr.Error(str(exc)) from exc
+
+    def generate_and_prepare_download(text, original_audio, normalized_audio, language):
+        baseline_path, clone_path = generate_from_input(
+            text, original_audio, normalized_audio, language
+        )
+        return (
+            baseline_path,
+            clone_path,
+            gr.DownloadButton(value=clone_path, interactive=bool(clone_path)),
+        )
 
     with gr.Blocks(title="Voice Cloner") as demo:
         lang_total = len(LANGUAGES)
@@ -120,32 +131,33 @@ def create_interface(tts_service: XTTSService):
             "</div></div>"
         )
 
+        gr.HTML(
+            """
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin: 4px 0 10px 0;">
+              <span style="background:#eef2ff; color:#1e3a8a; border-radius:999px; padding:5px 14px; font-size:14px;"><b>Step 1</b> Voice sample</span>
+              <span style="background:#eef2ff; color:#1e3a8a; border-radius:999px; padding:5px 14px; font-size:14px;"><b>Step 2</b> Prepare WAV</span>
+              <span style="background:#eef2ff; color:#1e3a8a; border-radius:999px; padding:5px 14px; font-size:14px;"><b>Step 3</b> Text &amp; language</span>
+              <span style="background:#eef2ff; color:#1e3a8a; border-radius:999px; padding:5px 14px; font-size:14px;"><b>Step 4</b> Generate &amp; download</span>
+            </div>
+            """
+        )
+
         clear_button = gr.Button("Clear All", variant="secondary")
         normalized_audio_state = gr.State(value=None)
 
         with gr.Group():
-            gr.Markdown("## 1. Input")
-            text_input = gr.Textbox(
-                label="Text to speak",
-                placeholder="Type a sentence or two...",
-                lines=3,
-            )
+            gr.Markdown("## Step 1: Record or upload your voice sample")
             reference_audio = gr.Audio(
                 label="Original voice sample",
                 sources=["microphone", "upload"],
                 type="filepath",
                 format="wav",
             )
-            language = gr.Dropdown(
-                choices=list(LANGUAGES.keys()),
-                value="English",
-                label="Speech language",
-            )
-            convert_button = gr.Button("Convert / Normalize to WAV", variant="secondary")
 
         with gr.Group():
-            gr.Markdown("## 2. Converted reference audio")
-            normalized_preview = gr.Audio(label="Normalized WAV — preview", type="filepath")
+            gr.Markdown("## Step 2: Convert to a normalized WAV")
+            convert_button = gr.Button("Convert / Normalize to WAV", variant="secondary")
+            normalized_preview = gr.Audio(label="Normalized WAV - preview", type="filepath")
             normalized_download = gr.File(label="Download normalized WAV")
 
         convert_button.click(
@@ -155,16 +167,35 @@ def create_interface(tts_service: XTTSService):
         )
 
         with gr.Group():
-            gr.Markdown("## 3. Generate and compare")
+            gr.Markdown("## Step 3: Enter the text and choose a language")
+            text_input = gr.Textbox(
+                label="Text to speak",
+                placeholder="Type a sentence or two...",
+                lines=3,
+            )
+            language = gr.Dropdown(
+                choices=list(LANGUAGES.keys()),
+                value="English",
+                label="Speech language",
+            )
+
+        with gr.Group():
+            gr.Markdown("## Step 4: Generate, compare and download")
             generate_button = gr.Button("Generate Speech", variant="primary", size="lg")
             with gr.Row():
                 baseline_output = gr.Audio(label=f"Baseline TTS (XTTS - {DEFAULT_SPEAKER})")
                 cloned_output = gr.Audio(label="Voice Clone (XTTS v2)")
+            clone_download = gr.DownloadButton(
+                "Download cloned voice (WAV)",
+                value=None,
+                interactive=False,
+                variant="secondary",
+            )
 
             generate_button.click(
-                fn=generate_from_input,
+                fn=generate_and_prepare_download,
                 inputs=[text_input, reference_audio, normalized_audio_state, language],
-                outputs=[baseline_output, cloned_output],
+                outputs=[baseline_output, cloned_output, clone_download],
             )
 
         clear_button.click(
@@ -179,6 +210,7 @@ def create_interface(tts_service: XTTSService):
                 normalized_download,
                 baseline_output,
                 cloned_output,
+                clone_download,
             ],
         )
 
