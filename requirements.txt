@@ -2,7 +2,7 @@ coqui-tts==0.27.5
 torch==2.8.0
 torchaudio==2.8.0
 transformers==4.57.6
-gradio
+Django>=5.2,<5.3
 static-ffmpeg==3.0
 pydub
 pypinyin

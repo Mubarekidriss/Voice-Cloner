@@ -8,3 +8,5 @@ env/
 *.mp3
 !tests/fixtures/*.wav
 .DS_Store
+#Django local database
+/db.sqlite3

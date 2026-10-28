@@ -7,18 +7,13 @@ Type text, record or upload a 6-10 second voice sample, and hear it spoken back 
 ways side by side: a standard AI voice (gTTS) and a clone of the sample voice
 (Coqui XTTS v2).
 
-## Quick start (Colab, recommended)
-
-Open `voice_cloner_demo.ipynb` in Google Colab (badge at the top of the notebook),
-switch the runtime to GPU (Runtime -> Change runtime type -> T4), then Run all.
-The first run downloads about 2 GB of model weights (3-5 minutes). Open the
-`gradio.live` link the last cell prints.
-
 ## Local run
 
 ```
 pip install -r requirements.txt
-python modules\app.py
+python manage.py migrate
+python manage.py check
+python manage.py runserver
 ```
 
 A GPU is strongly recommended; XTTS on CPU is very slow. See DEMO.md for a full walkthrough.
