@@ -770,3 +770,7 @@ select:disabled {
   background: var(--blue-soft);
   color: var(--blue-dark);
 }
+.consent-box { margin: 0 0 1rem; padding: 0.9rem 1rem; border: 1px solid #c9d2e3; border-radius: 10px; background: #f7f9fd; }
+.consent-label { display: flex; gap: 0.6rem; align-items: flex-start; font-weight: 600; cursor: pointer; }
+.consent-label input { margin-top: 0.25rem; width: 1.1rem; height: 1.1rem; flex: none; }
+.button:disabled { opacity: 0.55; cursor: not-allowed; }

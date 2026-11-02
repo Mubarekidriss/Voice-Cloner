@@ -217,9 +217,16 @@
             <p class="section-description">Generation may take a while on CPU, especially the first time the model is loaded.</p>
           </div>
         </div>
+        <div class="consent-box" id="consent-box">
+          <label class="consent-label" for="consent_ack">
+            <input id="consent_ack" name="consent_ack" type="checkbox" value="yes">
+            <span>I confirm that the voice sample is my own voice, or that the speaker gave me permission to clone it. I will not use this tool to impersonate, deceive or harm anyone.</span>
+          </label>
+          <p class="field-help">Audio is processed on the machine running this app and is not sent to a third party. Generated files are temporary. See RESPONSIBLE_USE.md for acceptable use, retention and model licensing (Coqui CPML).</p>
+        </div>
         <div class="generate-bar">
           <div><strong>Ready to compare?</strong><p>Generate baseline and reference-voice speech for the text above.</p></div>
-          <button type="submit" name="action" value="generate" class="button button-primary button-large">Generate speech</button>
+          <button type="submit" name="action" value="generate" id="generate-button" class="button button-primary button-large" disabled title="Confirm the consent statement above to enable generation">Generate speech</button>
         </div>
 
         {% if has_baseline or has_cloned %}
@@ -253,6 +260,14 @@
     (() => {
       const form = document.getElementById("voice-form");
       const scrollKey = "voiceClonerScrollY";
+
+      const consentBox = document.getElementById("consent_ack");
+      const generateButton = document.getElementById("generate-button");
+      if (consentBox && generateButton) {
+        const syncConsent = () => { generateButton.disabled = !consentBox.checked; };
+        consentBox.addEventListener("change", syncConsent);
+        syncConsent();
+      }
 
       if ("scrollRestoration" in history) {
         history.scrollRestoration = "manual";

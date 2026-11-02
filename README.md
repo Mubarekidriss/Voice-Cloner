@@ -4,7 +4,7 @@ ICS 499 Software Engineering and Capstone Project - Fall 2026, Group 12
 Team: Mubarek Idris & Mikita Misiulia
 
 Type text, record or upload a 6-10 second voice sample, and hear it spoken back two
-ways side by side: a standard AI voice (gTTS) and a clone of the sample voice
+ways side by side: a baseline XTTS voice and a clone of the sample voice
 (Coqui XTTS v2).
 
 ## Local run
@@ -50,3 +50,4 @@ Running the notebook or app accepts the Coqui Public Model License (CPML) for th
 XTTS v2 model: https://coqui.ai/cpml
 
 Only clone a voice with that person's permission. This project is coursework.
+See RESPONSIBLE_USE.md for acceptable use, where audio is processed, retention and risks.

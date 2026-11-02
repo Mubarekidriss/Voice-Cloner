@@ -2,10 +2,10 @@
 
 ## What the demo shows
 
-1. Type a sentence or two into the text box.
-2. Record (or upload) a 6-10 second voice sample.
-3. Submit - the app returns two audio players side by side:
-   - Standard AI voice (gTTS, no sample needed)
+1. Record (or upload) a 6-30 second voice sample of your own voice and convert it to WAV.
+2. Type a sentence or two into the text box and pick a language.
+3. Tick the consent box, then Generate speech - the app returns two audio players side by side:
+   - Baseline voice (XTTS default speaker, no sample needed)
    - Cloned voice (XTTS v2, copies the sample voice)
 
 ## Running it (Colab)
@@ -13,17 +13,17 @@
 1. Open the notebook from the repo: `voice_cloner_demo.ipynb` (Colab badge at top).
 2. Runtime -> Change runtime type -> GPU (T4).
 3. Runtime -> Run all. First run downloads ~2 GB, allow 3-5 minutes.
-4. Open the `gradio.live` link printed by the last cell.
-5. Run the three steps above with a short sample recorded live.
+4. Colab: the notebook may still start the old Gradio app. For the Django app, run the local steps below on your own machine instead.
 
 ## Running it locally
 
 ```
 pip install -r requirements.txt
-python modules\app.py
+python manage.py migrate
+python manage.py runserver
 ```
 
-Open the printed local URL (default http://127.0.0.1:7860). Same three steps.
+Open http://127.0.0.1:8000 and follow the four steps on the page.
 Use a GPU machine; CPU works but is slow.
 
 ## Known fixes baked in
@@ -37,4 +37,5 @@ Use a GPU machine; CPU works but is slow.
 
 - `cpu - WARNING` cell output: switch the Colab runtime to GPU and re-run.
 - Model download stalls: re-run the cell; the download resumes.
-- Gradio link expired: links live only as long as the session; re-run the last cell.
+- Generate is greyed out: tick the consent statement first.
+- Microphone recording only works on localhost or HTTPS.
