@@ -222,7 +222,7 @@
             <input id="consent_ack" name="consent_ack" type="checkbox" value="yes">
             <span>I confirm that the voice sample is my own voice, or that the speaker gave me permission to clone it. I will not use this tool to impersonate, deceive or harm anyone.</span>
           </label>
-          <p class="field-help">Audio is processed on the machine running this app and is not sent to a third party. Generated files are temporary. See RESPONSIBLE_USE.md for acceptable use, retention and model licensing (Coqui CPML).</p>
+          <p class="field-help">Audio is processed on the machine running this app; this code does not send it to another service. Your sample and generated audio stay in that machine's session folder until you select Clear all; there is no automatic expiry yet. See RESPONSIBLE_USE.md for acceptable use, retention and model licensing (Coqui CPML).</p>
         </div>
         <div class="generate-bar">
           <div><strong>Ready to compare?</strong><p>Generate baseline and reference-voice speech for the text above.</p></div>
@@ -250,7 +250,7 @@
       </section>
 
       <footer class="form-footer">
-        <p><strong>Responsible use:</strong> Only clone a voice with the speaker’s permission. This demo runs locally on your computer.</p>
+        <p><strong>Responsible use:</strong> Only clone a voice with the speaker’s permission. Audio stays on the computer running this app until you select Clear all.</p>
         <button type="submit" name="action" value="clear" class="button button-ghost" formnovalidate>Clear all</button>
       </footer>
     </form>

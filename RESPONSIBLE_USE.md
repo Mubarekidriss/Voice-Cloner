@@ -18,8 +18,10 @@ This project is ICS 499 coursework. This page covers what the app asks of users 
 ## What is stored, and for how long
 
 - Uploads are limited to 25 MB and 6-30 seconds. The app converts them to mono 22.05 kHz 16-bit WAV.
-- Temporary conversion and partial files are deleted by the code after use. Generated outputs are written to a temporary folder and removed when the session is cleared ("Clear all") or replaced by a new generation.
-- Open item: there is no timed deletion (for example a TTL) for generated files and no delete-after-download behavior yet. Backend retention is tracked as a separate task.
+- Each browser session gets a working folder on the machine running the app (`voice_cloner_sessions/<id>` under Django's `MEDIA_ROOT`). The uploaded sample, the normalized WAV and the generated baseline and cloned WAVs live there.
+- These files are kept until the user selects "Clear all", which deletes the whole folder. Normalizing a new sample deletes the old generated outputs. Generating again replaces them.
+- Temporary files created during conversion and generation are removed after they are copied into the session folder.
+- Not done yet: there is no automatic expiry (TTL), no delete-after-download, and no cleanup of abandoned session folders. Backend retention is a separate task.
 
 ## Security notes
 
