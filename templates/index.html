@@ -44,6 +44,35 @@
           <span>{{ lang_total }} languages configured</span>
         {% endif %}
       </div>
+      <div style="
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 14px;
+          flex-wrap: wrap;
+          margin-top: 18px;
+          color: white;
+      ">
+          <span>
+              Signed in as
+              <strong>{{ request.user.get_username }}</strong>
+          </span>
+
+          <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+
+              <button
+                  type="submit"
+                  class="button button-ghost"
+                  style="
+                      color: white;
+                      border-color: rgba(255,255,255,0.5);
+                  "
+              >
+                  Log out
+              </button>
+          </form>
+      </div>
     </header>
 
     {% if service_error %}
@@ -109,6 +138,19 @@
       {% csrf_token %}
 
       <section id="sample" class="panel workflow-panel">
+        <div class="consent-box" id="consent-box">
+          <label class="consent-label" for="consent_ack">
+            <input
+              id="consent_ack"
+              name="consent_ack"
+              type="checkbox"
+              value="yes"
+              {% if consent_acknowledged %}checked{% endif %}
+            >
+            <span>I confirm that the voice sample is my own voice, or that the speaker gave me permission to clone it. I will not use this tool to impersonate, deceive or harm anyone.</span>
+          </label>
+          <p class="field-help">Audio is processed on the machine running this app; this code does not send it to another service. Your sample and generated audio stay in that machine's session folder until you select Clear all; there is no automatic expiry yet. See RESPONSIBLE_USE.md for acceptable use, retention and model licensing (Coqui CPML).</p>
+        </div>
         <div class="panel-heading">
           <div class="step-number">01</div>
           <div>
@@ -216,13 +258,6 @@
             <h2>Generate, compare and download</h2>
             <p class="section-description">Generation may take a while on CPU, especially the first time the model is loaded.</p>
           </div>
-        </div>
-        <div class="consent-box" id="consent-box">
-          <label class="consent-label" for="consent_ack">
-            <input id="consent_ack" name="consent_ack" type="checkbox" value="yes">
-            <span>I confirm that the voice sample is my own voice, or that the speaker gave me permission to clone it. I will not use this tool to impersonate, deceive or harm anyone.</span>
-          </label>
-          <p class="field-help">Audio is processed on the machine running this app; this code does not send it to another service. Your sample and generated audio stay in that machine's session folder until you select Clear all; there is no automatic expiry yet. See RESPONSIBLE_USE.md for acceptable use, retention and model licensing (Coqui CPML).</p>
         </div>
         <div class="generate-bar">
           <div><strong>Ready to compare?</strong><p>Generate baseline and reference-voice speech for the text above.</p></div>

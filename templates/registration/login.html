@@ -1,0 +1,180 @@
+
+{% load static %}
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Sign In | Voice Cloner</title>
+
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+
+    <style>
+        .login-container {
+            width: min(460px, calc(100% - 32px));
+            margin: 8vh auto;
+        }
+
+        .login-panel {
+            padding: 28px;
+            margin-top: 20px;
+        }
+
+        .login-panel h2 {
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+
+        .login-description {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+
+        .login-field {
+            margin-bottom: 18px;
+        }
+
+        .login-field label {
+            display: block;
+            font-weight: 700;
+            font-size: 0.87rem;
+            margin-bottom: 7px;
+        }
+
+        .login-field input {
+            display: block;
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: white;
+            color: var(--ink);
+        }
+
+        .login-field input:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(50, 105, 181, 0.12);
+        }
+
+        .login-panel .button {
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .login-footer {
+            margin-top: 20px;
+            color: var(--muted);
+            font-size: 0.82rem;
+            text-align: center;
+        }
+
+        .login-errors {
+            margin-bottom: 18px;
+        }
+
+        .login-errors ul {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<main class="login-container">
+
+    <header class="hero">
+        <p class="eyebrow">ICS 499 Capstone · Group 12</p>
+
+        <h1>Voice Cloner</h1>
+
+        <p class="hero-description">
+            Sign in to access the voice generation application.
+        </p>
+    </header>
+
+
+    <section class="panel login-panel">
+
+        <h2>Sign in</h2>
+
+        <p class="login-description">
+            Enter your account credentials to continue.
+        </p>
+
+
+        {% if form.non_field_errors %}
+            <div class="notice notice-error login-errors" role="alert">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+
+        {% if next and user.is_authenticated %}
+            <div class="notice notice-warning">
+                Your account does not have access to that page.
+            </div>
+        {% endif %}
+
+
+        <form method="post" action="{% url 'login' %}">
+
+            {% csrf_token %}
+
+
+            <div class="login-field">
+                <label for="{{ form.username.id_for_label }}">
+                    Username
+                </label>
+
+                {{ form.username }}
+
+                {% for error in form.username.errors %}
+                    <p class="notice notice-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+
+            <div class="login-field">
+                <label for="{{ form.password.id_for_label }}">
+                    Password
+                </label>
+
+                {{ form.password }}
+
+                {% for error in form.password.errors %}
+                    <p class="notice notice-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+
+            <input
+                type="hidden"
+                name="next"
+                value="{{ next }}"
+            >
+
+
+            <button
+                type="submit"
+                class="button button-primary button-large"
+            >
+                Sign in
+            </button>
+
+        </form>
+
+
+        <p class="login-footer">
+            Accounts are created and managed by the application administrator.
+        </p>
+
+    </section>
+
+</main>
+
+</body>
+</html>

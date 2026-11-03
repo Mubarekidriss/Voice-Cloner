@@ -14,6 +14,12 @@ import uuid
 from pathlib import Path
 from threading import Lock
 
+from django.core.exceptions import ValidationError
+
+import time
+from .security import consent_required
+from django.contrib.auth.decorators import login_required
+
 # Supports either the project-root layout or the existing `modules/` layout.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODULES_DIR = PROJECT_ROOT / "modules"
@@ -43,8 +49,11 @@ from tts_engine import TTSEngineError, XTTSService, load_tts
 
 logger = logging.getLogger(__name__)
 
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024
-ALLOWED_AUDIO_SUFFIX = re.compile(r"^\.[a-zA-Z0-9]{1,8}$")
+ALLOWED_AUDIO_SUFFIX = re.compile(
+    r"^\.[a-zA-Z0-9]{1,8}$"
+)
+
+_workspace_cleanup_lock = Lock()
 
 # Load XTTS once per Django process. A separate generation lock prevents two
 # simultaneous requests from using the same model instance at the same time.
@@ -66,23 +75,174 @@ def _get_tts_service() -> XTTSService:
                 _tts_service = load_tts()
     return _tts_service
 
+def _private_sessions_root() -> Path:
+    """Return the private session storage directory."""
+
+    root = Path(settings.PRIVATE_AUDIO_ROOT).resolve()
+
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+
+    # Prevent accidentally placing private files inside MEDIA_ROOT.
+    if root == media_root or media_root in root.parents:
+        raise RuntimeError(
+            "PRIVATE_AUDIO_ROOT must be outside MEDIA_ROOT."
+        )
+
+    root.mkdir(
+        parents=True,
+        exist_ok=True,
+        mode=0o700
+    )
+
+    sessions_root = root / "sessions"
+
+    sessions_root.mkdir(
+        parents=True,
+        exist_ok=True,
+        mode=0o700
+    )
+
+    if os.name != "nt":
+        os.chmod(root, 0o700)
+        os.chmod(sessions_root, 0o700)
+
+    return sessions_root.resolve()
+
 
 def _workspace_dir(request, create: bool = True) -> Path:
-    """Return this browser session's private working folder."""
-    workspace_id = request.session.get("voice_cloner_workspace")
-    if not workspace_id or not re.fullmatch(r"[a-f0-9]{32}", workspace_id):
+    """
+    Return a private working directory for the current
+    authenticated user and browser session.
+    """
+
+    if not request.user.is_authenticated:
+        raise Http404("Authentication required.")
+
+    current_user_id = str(request.user.pk)
+
+    workspace_owner = request.session.get(
+        "voice_cloner_workspace_owner"
+    )
+
+    workspace_id = request.session.get(
+        "voice_cloner_workspace"
+    )
+
+    # If a different account is using this browser session,
+    # discard the previous account's session references.
+    if workspace_owner != current_user_id:
+
+        for key in (
+            "voice_cloner_workspace",
+            "voice_cloner_reference_name",
+            "voice_cloner_text",
+            "voice_cloner_language",
+        ):
+            request.session.pop(key, None)
+
+        workspace_id = None
+
+        request.session["voice_cloner_workspace_owner"] = (
+            current_user_id
+        )
+
+    # Create a new workspace if none exists or its ID is invalid.
+    if not workspace_id or not re.fullmatch(
+        r"[a-f0-9]{32}", workspace_id
+    ):
+
+        request.session.pop(
+            "voice_cloner_reference_name", None
+        )
+
         if not create:
             raise Http404("No audio workspace exists.")
-        workspace_id = uuid.uuid4().hex
-        request.session["voice_cloner_workspace"] = workspace_id
 
-    root = Path(settings.MEDIA_ROOT) / "voice_cloner_sessions"
+        workspace_id = uuid.uuid4().hex
+
+        request.session["voice_cloner_workspace"] = (
+            workspace_id
+        )
+
+        request.session["voice_cloner_workspace_owner"] = (
+            current_user_id
+        )
+
+    root = _private_sessions_root()
+
     workspace = root / workspace_id
+
+    if workspace.is_symlink():
+        raise Http404("Invalid audio workspace.")
+
     if create:
-        workspace.mkdir(parents=True, exist_ok=True)
+
+        workspace.mkdir(
+            parents=True,
+            exist_ok=True,
+            mode=0o700
+        )
+
     elif not workspace.is_dir():
+
         raise Http404("Audio workspace not found.")
+
+    workspace = workspace.resolve()
+
+    if workspace.parent != root:
+        raise Http404("Invalid audio workspace.")
+
+    if os.name != "nt":
+        os.chmod(workspace, 0o700)
+
+    # Refresh activity time for automatic audio retention.
+    os.utime(workspace, None)
+
     return workspace
+
+
+def _cleanup_expired_workspaces():
+    """
+    Delete inactive audio workspaces.
+
+    Removes original uploads, normalized audio, and generated
+    baseline/cloned recordings together.
+    """
+
+    root = _private_sessions_root()
+
+    retention = settings.AUDIO_RETENTION_SECONDS
+
+    if retention <= 0:
+        return
+
+    expiration_time = time.time() - retention
+
+    with _workspace_cleanup_lock:
+
+        for workspace in root.iterdir():
+
+            if workspace.is_symlink():
+                continue
+
+            if not workspace.is_dir():
+                continue
+
+            try:
+
+                last_activity = workspace.stat().st_mtime
+
+                if last_activity < expiration_time:
+
+                    shutil.rmtree(workspace)
+
+            except OSError:
+
+                logger.warning(
+                    "Could not remove expired audio workspace: %s",
+                    workspace,
+                    exc_info=True
+                )
 
 
 def _reference_path(request) -> Path | None:
@@ -110,39 +270,90 @@ def _delete_named_files(workspace: Path, *names: str) -> None:
 
 
 def _save_uploaded_reference(request, uploaded_file) -> Path:
-    """Save an uploaded/recorded audio file under a generated safe filename."""
-    if uploaded_file.size > MAX_UPLOAD_BYTES:
-        raise ValueError("The audio file is larger than 25 MB.")
+    """Save and validate an uploaded or recorded audio sample."""
+
+    max_upload_size = settings.MAX_AUDIO_UPLOAD_BYTES
+
+    if uploaded_file.size > max_upload_size:
+        raise ValueError("The audio file exceeds the 25 MB limit.")
+
     if uploaded_file.size == 0:
         raise ValueError("The uploaded audio file is empty.")
 
     suffix = Path(uploaded_file.name).suffix.lower()
+
     if not ALLOWED_AUDIO_SUFFIX.fullmatch(suffix):
-        suffix = ".audio"
+        raise ValueError("The uploaded audio file has an invalid extension.")
 
     workspace = _workspace_dir(request)
-    old_name = request.session.get("voice_cloner_reference_name")
-    new_name = f"reference_original{suffix}"
-    destination = workspace / new_name
-    partial = workspace / f"{new_name}.uploading"
 
-    # Save to a temporary name first so an interrupted upload does not leave a
-    # file that looks like a successfully saved reference.
+    old_name = request.session.get(
+        "voice_cloner_reference_name"
+    )
+
+    new_name = f"reference_original{suffix}"
+
+    destination = workspace / new_name
+
+    # Unique temporary filename, retaining the real audio extension
+    # so the existing audio validator can identify the format.
+    partial = workspace / (
+        f".{uuid.uuid4().hex}.uploading{suffix}"
+    )
+
+    copied_size = 0
+
     try:
-        with partial.open("wb") as target:
+
+        with partial.open("xb") as target:
+
             for chunk in uploaded_file.chunks():
+
+                copied_size += len(chunk)
+
+                if copied_size > max_upload_size:
+                    raise ValueError(
+                        "The audio file exceeds the 25 MB limit."
+                    )
+
                 target.write(chunk)
+
+            target.flush()
+            os.fsync(target.fileno())
+
+        if copied_size != uploaded_file.size:
+            raise ValueError(
+                "The uploaded audio file was not saved completely."
+            )
+
+        if os.name != "nt":
+            os.chmod(partial, 0o600)
+
+        # Use the project's existing audio validation module.
+        validate_audio(str(partial))
+
+        # Only replace the previous reference after validation succeeds.
         partial.replace(destination)
+
     except Exception:
+
         partial.unlink(missing_ok=True)
+
         raise
 
     if old_name and old_name != new_name:
         _delete_named_files(workspace, old_name)
 
     request.session["voice_cloner_reference_name"] = new_name
-    # A changed reference invalidates its normalized copy and both old results.
-    _delete_named_files(workspace, "normalized.wav", "baseline.wav", "cloned.wav")
+
+    # A new reference invalidates all existing derived audio.
+    _delete_named_files(
+        workspace,
+        "normalized.wav",
+        "baseline.wav",
+        "cloned.wav"
+    )
+
     return destination
 
 
@@ -152,6 +363,9 @@ def _copy_and_remove_temp(source_path, destination_path: Path, workspace: Path) 
     if not source.is_file():
         raise RuntimeError(f"The audio engine did not create the expected output: {source.name}")
     shutil.copy2(source, destination_path)
+
+    if os.name != "nt":
+        os.chmod(destination_path, 0o600)
 
     try:
         resolved_source = source.resolve()
@@ -223,13 +437,21 @@ def _render_home(request, *, service=None, service_error=None, status_message=No
         "model_loaded": service is not None,
         "configured_languages": set(LANGUAGES.values()),
         "device": getattr(service, "device", "not loaded yet"),
+        "consent_acknowledged": (
+            request.session.get("voice_cloner_consent_acknowledged")
+            is True
+        ),
     }
     return render(request, "index.html", context)
 
 
+@login_required
 @require_http_methods(["GET", "POST"])
+@consent_required
 def index(request):
     """Render the UI and handle upload, normalize, generate, and clear actions."""
+    _cleanup_expired_workspaces()
+
     if request.method == "GET":
         return _render_home(request, service=_tts_service)
 
@@ -242,19 +464,29 @@ def index(request):
             pass
         for key in (
             "voice_cloner_workspace",
+            "voice_cloner_workspace_owner",
             "voice_cloner_reference_name",
             "voice_cloner_text",
             "voice_cloner_language",
+            "voice_cloner_consent_acknowledged",
         ):
             request.session.pop(key, None)
         return redirect("voice_cloner_home")
 
     text = request.POST.get("text_input", "")
     language = request.POST.get("language", "English")
-    request.session["voice_cloner_text"] = text
-    request.session["voice_cloner_language"] = language if language in LANGUAGES else "English"
 
     try:
+        # Bind the current session to the authenticated user
+        # before saving any new session-specific information.
+        if action in {"upload", "normalize", "generate"}:
+            _workspace_dir(request, create=True)
+
+        request.session["voice_cloner_text"] = text
+
+        request.session["voice_cloner_language"] = (
+            language if language in LANGUAGES else "English"
+        )
         # This also supports choosing a new file and clicking Normalize or
         # Generate directly, without requiring a separate upload-button click.
         uploaded = request.FILES.get("reference_audio")
@@ -281,6 +513,9 @@ def index(request):
             normalized_path = workspace / "normalized.wav"
             try:
                 shutil.copy2(temporary_wav, normalized_path)
+
+                if os.name != "nt":
+                    os.chmod(normalized_path, 0o600)
             finally:
                 try:
                     if temporary_wav.resolve() != normalized_path.resolve():
@@ -365,32 +600,67 @@ def index(request):
     return redirect("voice_cloner_home")
 
 
+@login_required
 @require_http_methods(["GET"])
 def audio_file(request, kind: str):
-    """Stream a session-owned audio file; files aren't exposed as public MEDIA URLs."""
+    """Stream private audio belonging to the current browser session."""
+
+    _cleanup_expired_workspaces()
+
     allowed_names = {
-        "original": request.session.get("voice_cloner_reference_name"),
+        "original": request.session.get(
+            "voice_cloner_reference_name"
+        ),
         "normalized": "normalized.wav",
         "baseline": "baseline.wav",
         "cloned": "cloned.wav",
     }
+
     if kind not in allowed_names:
         raise Http404("Unknown audio file.")
 
     name = allowed_names[kind]
+
     if not name or Path(name).name != name:
         raise Http404("Audio file not found.")
 
-    workspace = _workspace_dir(request, create=False)
-    path = workspace / name
-    if not path.is_file():
+    try:
+        workspace = _workspace_dir(
+            request,
+            create=False
+        ).resolve()
+
+        candidate = workspace / name
+
+        if candidate.is_symlink():
+            raise Http404("Audio file not found.")
+
+        path = candidate.resolve(strict=True)
+
+    except (OSError, RuntimeError):
+        raise Http404("Audio file not found.")
+
+    if path.parent != workspace or not path.is_file():
         raise Http404("Audio file not found.")
 
     download = request.GET.get("download") == "1"
-    content_type = "audio/wav" if path.suffix.lower() == ".wav" else None
-    return FileResponse(
+
+    content_type = (
+        "audio/wav"
+        if path.suffix.lower() == ".wav"
+        else None
+    )
+
+    response = FileResponse(
         path.open("rb"),
         as_attachment=download,
         filename=path.name,
         content_type=content_type,
     )
+
+    # Prevent browsers and intermediaries from caching sensitive recordings.
+    response["Cache-Control"] = "private, no-store, max-age=0"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Pragma"] = "no-cache"
+
+    return response

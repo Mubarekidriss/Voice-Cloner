@@ -19,7 +19,11 @@
 
 ```
 pip install -r requirements.txt
+python manage.py createsuperuser
 python manage.py migrate
+```
+**Follow console prompts**
+```
 python manage.py runserver
 ```
 
