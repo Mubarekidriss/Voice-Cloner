@@ -17,14 +17,29 @@
 
 ## Running it locally
 
+**To create a user in the local database if you don't have it yet**
 ```
-pip install -r requirements.txt
 python manage.py createsuperuser
-python manage.py migrate
 ```
-**Follow console prompts**
+**For Windows AMD systems**
 ```
-python manage.py runserver
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install_amd_rocm_python312.ps1"
+.\.venv-amd\Scripts\python.exe manage.py runserver
+```
+**Or a separate script for CPU for Windows**
+```
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install_cpu_python311.ps1"
+.\.venv-cpu\Scripts\python.exe manage.py runserver
+```
+**Apple Silicon for MacOS**
+```
+bash install_macos_apple_silicon.sh
+./.venv-macos-apple-silicon/bin/python manage.py runserver
+```
+**Intel for MacOS**
+```
+bash install_macos_intel.sh
+./.venv-macos-intel/bin/python manage.py runserver
 ```
 
 Open http://127.0.0.1:8000 and follow the four steps on the page.

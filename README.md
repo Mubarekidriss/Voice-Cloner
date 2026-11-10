@@ -9,12 +9,31 @@ ways side by side: a baseline XTTS voice and a clone of the sample voice
 
 ## Local run
 
+**To create a user in the local database if you don't have it yet**
 ```
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py check
-python manage.py runserver
+python manage.py createsuperuser
 ```
+**For Windows AMD systems**
+```
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install_amd_rocm_python312.ps1"
+.\.venv-amd\Scripts\python.exe manage.py runserver
+```
+**Or a separate script for CPU for Windows**
+```
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install_cpu_python311.ps1"
+.\.venv-cpu\Scripts\python.exe manage.py runserver
+```
+**Apple Silicon for MacOS**
+```
+bash install_macos_apple_silicon.sh
+./.venv-macos-apple-silicon/bin/python manage.py runserver
+```
+**Intel for MacOS**
+```
+bash install_macos_intel.sh
+./.venv-macos-intel/bin/python manage.py runserver
+```
+
 
 A GPU is strongly recommended; XTTS on CPU is very slow. See DEMO.md for a full walkthrough.
 

@@ -14,3 +14,4 @@ env/
 /runtime_audio_private/
 # Local runtime media
 /runtime_media/
+.venv-amd
