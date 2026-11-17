@@ -15,3 +15,5 @@ env/
 # Local runtime media
 /runtime_media/
 .venv-amd
+# Standalone local inference results
+/local_outputs/
