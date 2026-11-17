@@ -311,7 +311,8 @@ SECURE_HSTS_PRELOAD = (
     SECURE_HSTS_SECONDS > 0
 )
 
-# Render terminates HTTPS at its reverse proxy.
+# Render terminates HTTPS at its proxy.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # This allows Django to recognize the original HTTPS connection.
 
 if not DEBUG:
