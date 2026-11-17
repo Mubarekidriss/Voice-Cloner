@@ -7,6 +7,13 @@ Type text, record or upload a 6-10 second voice sample, and hear it spoken back 
 ways side by side: a baseline XTTS voice and a clone of the sample voice
 (Coqui XTTS v2).
 
+## Standalone local inference
+
+To generate WAV files on your computer without the web server, see
+[LOCAL_INFERENCE.md](LOCAL_INFERENCE.md). The helper reuses the existing engine;
+it does not change the hosted Generate button. Real-model inference on the
+presenting computer still needs to be verified.
+
 ## Local run
 
 **To create a user in the local database if you don't have it yet**
