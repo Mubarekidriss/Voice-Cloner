@@ -169,7 +169,10 @@
 
 
         <p class="login-footer">
-            Accounts are created and managed by the application administrator.
+            Don't have an account?
+            <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">
+                Create an account
+            </a>
         </p>
 
     </section>

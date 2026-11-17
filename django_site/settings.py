@@ -7,6 +7,7 @@ import os
 
 from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
+import dj_database_url
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -50,6 +51,20 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# Render automatically supplies this hostname for deployed services.
+RENDER_EXTERNAL_HOSTNAME = os.environ.get(
+    "RENDER_EXTERNAL_HOSTNAME"
+)
+
+if RENDER_EXTERNAL_HOSTNAME:
+
+    if RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+    render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 # ---------------------------------------------------------
 # APPLICATIONS
@@ -73,6 +88,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+
+    # Serve collected static files in production.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -112,12 +131,28 @@ WSGI_APPLICATION = "django_site.wsgi.application"
 # DATABASE
 # ---------------------------------------------------------
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
+
+    # Production database, such as Render PostgreSQL.
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=not DEBUG,
+        )
     }
-}
+
+else:
+
+    # Local development database.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # ---------------------------------------------------------
@@ -168,11 +203,30 @@ USE_TZ = True
 # STATIC AND MEDIA FILES
 # ---------------------------------------------------------
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 
 STATICFILES_DIRS = [
     BASE_DIR / "static"
 ]
+
+# Destination for collectstatic.
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Keep the default storage for ordinary uploaded files.
+# Use compressed, hashed static files in production.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if not DEBUG
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
+        ),
+    },
+}
 
 MEDIA_ROOT = BASE_DIR / "runtime_media"
 
@@ -256,6 +310,15 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = (
 SECURE_HSTS_PRELOAD = (
     SECURE_HSTS_SECONDS > 0
 )
+
+# Render terminates HTTPS at its reverse proxy.
+# This allows Django to recognize the original HTTPS connection.
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = (
+        "HTTP_X_FORWARDED_PROTO",
+        "https"
+    )
 
 
 # ---------------------------------------------------------

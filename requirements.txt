@@ -8,3 +8,7 @@ cutlet
 unidic-lite
 six
 soundfile
+whitenoise>=6.12,<7
+waitress>=3.0,<4
+dj-database-url>=2.2,<3
+psycopg[binary]>=3.2,<4
