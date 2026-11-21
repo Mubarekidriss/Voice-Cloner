@@ -1,39 +1,31 @@
-# Responsible Use - Voice Cloner (FP8)
+# Responsible use and audio handling
 
-This project is ICS 499 coursework. This page covers what the app asks of users and what it does with audio. It describes the current code and marks what is still open.
+This is ICS 499 coursework. This document describes the FP11 review patch, not proof that the deployed service has been updated.
 
-## Acceptable use
+## Permission and acceptable use
 
-- Clone only your own voice, or a voice whose owner gave you clear permission.
-- Do not use the output to impersonate a real person, deceive or defraud anyone, harass, or make content that could harm someone.
-- Do not use text you have no right to reproduce.
-- The web page shows a consent statement. The Generate button stays disabled until it is checked. This check is in the page only; server-side enforcement is not part of this change.
+Clone only your own voice or a voice whose owner gave clear permission. Do not impersonate, deceive, defraud, harass or harm anyone. Use text you have permission to reproduce. The website requires login and checks consent server-side on every upload, normalize and generate request, with Django CSRF protection. In remote mode, permission must also cover sending the sample and text to the configured model computer. Only use a host you trust.
 
-## Where audio is processed
+## Where processing happens
 
-- The app runs on the machine that starts it (`python manage.py runserver`, or the Colab runtime for the notebook). Audio and text are processed there by the Coqui XTTS v2 model and are not sent to another service by this code.
-- In Colab, the runtime is a Google-hosted machine. Treat samples uploaded there as handled by Colab.
-- The standard (baseline) voice is the XTTS default speaker, not a separate online service.
+In local mode, model processing happens on the computer running the app. In remote mode, the browser uploads to the website, the website sends the normalized sample and text over its configured connection to the model worker, and the worker returns baseline and cloned audio. Both outputs use XTTS, with its configured default speaker for the baseline. This is not on-device browser inference. The model computer must be running and reachable. Colab notebooks remain separate: their data is processed in Google's runtime.
 
-## What is stored, and for how long
+## Storage and deletion
 
-- Uploads are limited to 25 MB and 6-30 seconds. The app converts them to mono 22.05 kHz 16-bit WAV.
-- Each browser session gets a working folder on the machine running the app (`voice_cloner_sessions/<id>` under Django's `MEDIA_ROOT`). The uploaded sample, the normalized WAV and the generated baseline and cloned WAVs live there.
-- These files are kept until the user selects "Clear all", which deletes the whole folder. Normalizing a new sample deletes the old generated outputs. Generating again replaces them.
-- Temporary files created during conversion and generation are removed after they are copied into the session folder.
-- Not done yet: there is no automatic expiry (TTL), no delete-after-download, and no cleanup of abandoned session folders. Backend retention is a separate task.
+The website stores uploads, normalized WAV and generated audio in private user/browser-session folders under PRIVATE_AUDIO_ROOT, outside MEDIA_ROOT. Audio routes require login and the matching session, with no-store headers. Clear all deletes that session folder. Replacing a reference invalidates older derived audio. A new generation removes earlier outputs before trying again so a failed retry does not display stale results.
 
-## Security notes
+Inactive website folders older than one hour are cleaned when the app is accessed again, not by a guaranteed deletion timer. Host restarts may remove files sooner. This policy concerns audio folders, not account/database deletion. Database expiry is not verified.
 
-- Forms use Django CSRF protection.
-- Open items for the backend: the development `SECRET_KEY` and `DEBUG = True` in `django_site/settings.py` must be replaced for any shared or deployed use, `ALLOWED_HOSTS` must be set, and there is no login or access control. The app is meant for local use only until these are done.
+The worker processes one generation at a time. Its temporary input and output files are removed after success or failure on a best-effort basis. Crashes or power loss can leave temporary files. Clear all on the website does not cancel a running worker request or guarantee secure erasure on either host. Model computation may continue after a timeout/disconnect.
 
-## Risks of voice cloning
+## Connection safeguards and limits
 
-- Cloned speech can be mistaken for a real person's voice. Misuse includes fraud, impersonation and misinformation.
-- Quality varies by language and sample. Do not treat output as proof that a person said something.
-- Keep samples and outputs private, and delete files you no longer need.
+The worker binds to loopback and needs a private shared key; browsers do not receive that key. Public exposure requires a separately reviewed secure connection. The website client requires HTTPS outside explicitly allowed local debug tests, does not follow redirects or inherit proxies, and validates bounded JSON/WAV responses before saving them. The worker rejects browser-origin requests. These are safeguards, not a production-security certification.
 
-## Model license
+Samples are limited to 25 MiB and 6 to 30 seconds. Text is limited to 2000 characters. Both generated WAV outputs are size-limited and validated. Logs must not include voice data, input text or shared keys. Keep production DEBUG disabled and use a private production Django secret, allowed hosts and HTTPS configuration.
 
-The XTTS v2 model is covered by the Coqui Public Model License (CPML): https://coqui.ai/cpml. The CPML limits use to non-commercial purposes. The code sets `COQUI_TOS_AGREED=1` so the model loads without a prompt, which means running the app counts as accepting the license.
+## Model terms and output risks
+
+Review the model publisher's current terms before downloading or using XTTS. The existing project references the Coqui Public Model License at https://coqui.ai/cpml. The FP11 Django startup and worker do not automatically set a license-acceptance environment variable. This document is not acceptance of terms and does not establish rights for any particular use.
+
+Cloned speech can be mistaken for a real person's voice. Quality varies. Do not present an output as evidence of what someone actually said. Keep samples and outputs private and delete files you no longer need.
