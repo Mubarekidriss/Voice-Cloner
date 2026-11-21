@@ -327,3 +327,14 @@ if not DEBUG:
 # ---------------------------------------------------------
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# FP11: web process can call an authorized external model worker.
+VOICE_INFERENCE_MODE = os.environ.get("VOICE_INFERENCE_MODE", "local").lower()
+if VOICE_INFERENCE_MODE not in {"local", "remote"}:
+    raise ImproperlyConfigured("VOICE_INFERENCE_MODE must be local or remote.")
+VOICE_WORKER_URL = os.environ.get("VOICE_WORKER_URL", "")
+VOICE_WORKER_SECRET = os.environ.get("VOICE_WORKER_SECRET", "")
+VOICE_WORKER_TIMEOUT = int(os.environ.get("VOICE_WORKER_TIMEOUT", "180"))
+if not 1 <= VOICE_WORKER_TIMEOUT <= 600:
+    raise ImproperlyConfigured("VOICE_WORKER_TIMEOUT must be 1 to 600 seconds.")
+VOICE_WORKER_ALLOW_LOOPBACK = DEBUG and os.environ.get("VOICE_WORKER_ALLOW_LOOPBACK", "false").lower() == "true"
