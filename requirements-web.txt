@@ -1,0 +1,8 @@
+# No XTTS, torch or model-only language packages in the web process.
+Django>=5.2,<5.3
+static-ffmpeg==3.0
+pydub
+whitenoise>=6.12,<7
+waitress>=3.0,<4
+dj-database-url>=2.2,<3
+psycopg[binary]>=3.2,<4
