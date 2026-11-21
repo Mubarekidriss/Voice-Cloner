@@ -32,7 +32,9 @@
         <span class="status-dot"></span>
         <span>XTTS v2</span>
 
-        {% if model_loaded %}
+        {% if remote_mode %}
+          <span>Remote worker configured, availability checked on Generate</span>
+        {% elif model_loaded %}
           <span class="status-divider">·</span>
           <span>Device: <strong>{{ device }}</strong></span>
           <span class="status-divider">·</span>
@@ -149,7 +151,7 @@
             >
             <span>I confirm that the voice sample is my own voice, or that the speaker gave me permission to clone it. I will not use this tool to impersonate, deceive or harm anyone.</span>
           </label>
-          <p class="field-help">Audio is processed on the machine running this app; this code does not send it to another service. Your sample and generated audio stay in that machine's session folder until you select Clear all; there is no automatic expiry yet. See RESPONSIBLE_USE.md for acceptable use, retention and model licensing (Coqui CPML).</p>
+          <p class="field-help">Uploads and outputs are stored in private website session folders. In remote mode, your sample and text are sent to the configured model computer and both generated files return to the website. Only use this mode when you trust that host and the speaker permits this transfer. Clear all removes this session folder; inactive folders are cleaned on later app access after one hour. Restarts may remove audio sooner. Worker temporary files are deleted after each request on a best-effort basis. See RESPONSIBLE_USE.md for model licensing and limits.</p>
         </div>
         <div class="panel-heading">
           <div class="step-number">01</div>
@@ -233,8 +235,8 @@
         </div>
         <div class="field-group">
           <label class="field-label" for="text_input">Text to speak</label>
-          <textarea id="text_input" name="text_input" rows="4" maxlength="10000" placeholder="Type a sentence or two...">{{ text_input }}</textarea>
-          <div class="field-footnote"><span>Do not use text you do not have permission to reproduce.</span><span id="character-count">{{ text_input|length }}/10000</span></div>
+          <textarea id="text_input" name="text_input" rows="4" maxlength="2000" placeholder="Type a sentence or two...">{{ text_input }}</textarea>
+          <div class="field-footnote"><span>Do not use text you do not have permission to reproduce.</span><span id="character-count">{{ text_input|length }}/2000</span></div>
         </div>
         <div class="field-group language-select-group">
           <label class="field-label" for="language">Speech language</label>
@@ -285,7 +287,7 @@
       </section>
 
       <footer class="form-footer">
-        <p><strong>Responsible use:</strong> Only clone a voice with the speaker’s permission. Audio stays on the computer running this app until you select Clear all.</p>
+        <p><strong>Responsible use:</strong> Only clone a voice with the speaker’s permission. Remote mode transfers audio and text to the configured model computer. Use Clear all to remove this website session's audio.</p>
         <button type="submit" name="action" value="clear" class="button button-ghost" formnovalidate>Clear all</button>
       </footer>
     </form>
@@ -339,7 +341,7 @@
       const actionMessages = {
         upload: "Saving your voice sample...",
         normalize: "Validating and preparing your audio...",
-        generate: "Loading XTTS and generating speech. This may take several minutes on CPU...",
+        generate: "Connecting to the model and generating speech. This may take several minutes on CPU...",
         clear: "Clearing your session..."
       };
 
@@ -403,7 +405,7 @@
       });
 
       textInput.addEventListener("input", () => {
-        characterCount.textContent = `${textInput.value.length}/10000`;
+        characterCount.textContent = `${textInput.value.length}/2000`;
       });
 
       recordButton.addEventListener("click", async () => {

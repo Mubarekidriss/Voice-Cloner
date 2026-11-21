@@ -26,26 +26,16 @@ MODULES_DIR = PROJECT_ROOT / "modules"
 if MODULES_DIR.is_dir() and str(MODULES_DIR) not in sys.path:
     sys.path.insert(0, str(MODULES_DIR))
 
-# Set the Coqui consent flag before importing/initializing the model, matching
-# the existing local Gradio application's behavior.
-os.environ.setdefault("COQUI_TOS_AGREED", "1")
-
-# Makes a bundled FFmpeg/ffprobe available to pydub and audio conversion code.
-# Keep this if static-ffmpeg is already part of the project's requirements.
-import static_ffmpeg
-
-static_ffmpeg.add_paths()
-
 from django.conf import settings
 from django.contrib import messages
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
-from audio_utils import normalize_audio
 from audio_validation import AudioValidationError, validate_audio
 from config import DEFAULT_SPEAKER, LANGUAGES
-from tts_engine import TTSEngineError, XTTSService, load_tts
+from tts_engine import TTSEngineError
+from .remote_worker import RemoteService
 
 logger = logging.getLogger(__name__)
 
@@ -62,18 +52,28 @@ _tts_service_lock = Lock()
 _generation_lock = Lock()
 
 
-def _get_tts_service() -> XTTSService:
+def _get_tts_service():
     """Create the service on first use and reuse it for later requests.
 
     This assumes XTTSService() loads/validates its model in its constructor.
     If your implementation has an explicit load() call, call it here once.
     """
+    if settings.VOICE_INFERENCE_MODE == 'remote':
+        return RemoteService()
+    from tts_engine import load_tts
     global _tts_service
     if _tts_service is None:
         with _tts_service_lock:
             if _tts_service is None:
                 _tts_service = load_tts()
     return _tts_service
+
+def normalize_audio(path):
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+    from audio_utils import normalize_audio as convert
+    return convert(path)
+
 
 def _private_sessions_root() -> Path:
     """Return the private session storage directory."""
@@ -434,7 +434,8 @@ def _render_home(request, *, service=None, service_error=None, status_message=No
         "has_baseline": has_baseline,
         "has_cloned": has_cloned,
         "original_name": reference_name,
-        "model_loaded": service is not None,
+        "model_loaded": service is not None and settings.VOICE_INFERENCE_MODE != "remote",
+        "remote_mode": settings.VOICE_INFERENCE_MODE == "remote",
         "configured_languages": set(LANGUAGES.values()),
         "device": getattr(service, "device", "not loaded yet"),
         "consent_acknowledged": (
@@ -527,13 +528,14 @@ def index(request):
             messages.success(request, "Audio normalized successfully. You can preview or download the WAV.")
 
         elif action == "generate":
+            _delete_named_files(_workspace_dir(request), "baseline.wav", "cloned.wav")
             original_path = _reference_path(request)
             if not original_path:
                 raise ValueError("Please record or upload a voice sample.")
             if not text.strip():
                 raise ValueError("Enter the text you want the model to speak.")
-            if len(text) > 10000:
-                raise ValueError("Text must be 10,000 characters or fewer.")
+            if len(text) > 2000:
+                raise ValueError("Text must be 2000 characters or fewer.")
             if language not in LANGUAGES:
                 raise ValueError("Choose a valid speech language.")
 
@@ -546,21 +548,29 @@ def index(request):
 
             service = _get_tts_service()
             language_code = LANGUAGES[language]
-            if language_code not in service.available_languages:
+            if settings.VOICE_INFERENCE_MODE != "remote" and language_code not in service.available_languages:
                 raise ValueError(f"{language} is not available in the loaded XTTS model.")
 
             # Remove older outputs first so a failed retry cannot leave stale
             # audio visible as if it came from the newest text/reference.
             _delete_named_files(workspace, "baseline.wav", "cloned.wav")
-            baseline_temp = clone_temp = None
+            baseline_temp = clone_temp = conversion_temp = None
             try:
+                if settings.VOICE_INFERENCE_MODE == "remote" and not normalized_path.is_file():
+                    conversion_temp = Path(normalize_audio(str(original_path)))
+                    reference_path = conversion_temp
                 with _generation_lock:
                     baseline_temp, clone_temp = service.generate_voices(
                         text.strip(), str(reference_path), language
                     )
                     _copy_and_remove_temp(baseline_temp, workspace / "baseline.wav", workspace)
                     _copy_and_remove_temp(clone_temp, workspace / "cloned.wav", workspace)
+            except Exception:
+                _delete_named_files(workspace, "baseline.wav", "cloned.wav")
+                raise
             finally:
+                if conversion_temp:
+                    conversion_temp.unlink(missing_ok=True)
                 for candidate in (baseline_temp, clone_temp):
                     if candidate:
                         path = Path(candidate)
