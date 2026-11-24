@@ -17,3 +17,4 @@ env/
 .venv-amd
 # Standalone local inference results
 /local_outputs/
+/cloudflared.exe

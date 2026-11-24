@@ -135,6 +135,7 @@ def _workspace_dir(request, create: bool = True) -> Path:
         for key in (
             "voice_cloner_workspace",
             "voice_cloner_reference_name",
+            "voice_cloner_reference_version",
             "voice_cloner_text",
             "voice_cloner_language",
         ):
@@ -153,6 +154,9 @@ def _workspace_dir(request, create: bool = True) -> Path:
 
         request.session.pop(
             "voice_cloner_reference_name", None
+        )
+        request.session.pop(
+            "voice_cloner_reference_version", None
         )
 
         if not create:
@@ -345,6 +349,7 @@ def _save_uploaded_reference(request, uploaded_file) -> Path:
         _delete_named_files(workspace, old_name)
 
     request.session["voice_cloner_reference_name"] = new_name
+    request.session["voice_cloner_reference_version"] = uuid.uuid4().hex
 
     # A new reference invalidates all existing derived audio.
     _delete_named_files(
@@ -434,6 +439,7 @@ def _render_home(request, *, service=None, service_error=None, status_message=No
         "has_baseline": has_baseline,
         "has_cloned": has_cloned,
         "original_name": reference_name,
+        "original_version": request.session.get("voice_cloner_reference_version", ""),
         "model_loaded": service is not None and settings.VOICE_INFERENCE_MODE != "remote",
         "remote_mode": settings.VOICE_INFERENCE_MODE == "remote",
         "configured_languages": set(LANGUAGES.values()),
@@ -467,6 +473,7 @@ def index(request):
             "voice_cloner_workspace",
             "voice_cloner_workspace_owner",
             "voice_cloner_reference_name",
+            "voice_cloner_reference_version",
             "voice_cloner_text",
             "voice_cloner_language",
             "voice_cloner_consent_acknowledged",

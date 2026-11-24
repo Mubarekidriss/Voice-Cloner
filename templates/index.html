@@ -191,7 +191,9 @@
               <div><h3>Current reference sample</h3><p>{{ original_name }}</p></div>
               <span class="state-pill">Saved</span>
             </div>
-            <audio controls preload="metadata" src="{% url 'voice_cloner_audio' 'original' %}">Your browser does not support audio playback.</audio>
+            <audio controls preload="metadata" src="{% url 'voice_cloner_audio' 'original' %}?v={{ original_version }}">
+                Your browser does not support audio playback.
+            </audio>
           </div>
         {% endif %}
       </section>
@@ -208,7 +210,9 @@
         <div class="action-strip">
           <button type="submit" name="action" value="normalize" class="button button-secondary">Convert / Normalize to WAV</button>
           {% if has_normalized %}
-            <a class="text-link" href="{% url 'voice_cloner_audio' 'normalized' %}?download=1">Download normalized WAV</a>
+            <a class="text-link" href="{% url 'voice_cloner_audio' 'normalized' %}?v={{ original_version }}&download=1">
+                Download normalized WAV
+            </a>
           {% endif %}
         </div>
         {% if has_normalized %}
@@ -217,7 +221,9 @@
               <div><h3>Normalized WAV preview</h3><p>Ready to use as the voice reference.</p></div>
               <span class="state-pill">Ready</span>
             </div>
-            <audio controls preload="metadata" src="{% url 'voice_cloner_audio' 'normalized' %}">Your browser does not support audio playback.</audio>
+            <audio controls preload="metadata" src="{% url 'voice_cloner_audio' 'normalized' %}?v={{ original_version }}">
+                Your browser does not support audio playback.
+            </audio>
           </div>
         {% else %}
           <p class="empty-hint">No normalized WAV yet. Choose or record a sample above, then select Convert / Normalize to WAV.</p>
